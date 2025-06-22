@@ -19,8 +19,8 @@ void main(void)
     init();
 
     // main loop
-    while (true)        
+    while (true)
     {
-    }    
+    }
     return;
 }

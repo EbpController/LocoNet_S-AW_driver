@@ -14,6 +14,7 @@
 
 // include libraries
 
+#include "eeprom.h"
 #include "ln.h"
 #include "aw.h"
 #include "s.h"

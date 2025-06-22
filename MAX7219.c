@@ -25,11 +25,23 @@ void MAX7219_init()
     ANSELEbits.ANSELE0 = false;
     ANSELEbits.ANSELE1 = false;
     ANSELEbits.ANSELE2 = false;
+    // set output states
+    DIN = 0;
+    CLK = 0;
+    CS = 0;
+    
+    // make a small delay for startup
+    for (uint16_t i = 0; i < 0x2000; i++) NOP();
     
     // init MAX7219
     // scan all eight rows
     MAX7219_send(MAX7219_MODE_SCANLIMIT, 0x07);
     MAX7219_send(MAX7219_MODE_SCANLIMIT, 0x07);
+    MAX7219_update();
+    
+    // no display test mode (normal operation))
+    MAX7219_send(MAX7219_MODE_TEST, 0x00);
+    MAX7219_send(MAX7219_MODE_TEST, 0x00);
     MAX7219_update();
     
     // set MAX7219 to no-decoding mode
@@ -61,6 +73,8 @@ void MAX7219_init()
 }
 
 // </editor-fold>
+
+// <editor-fold defaultstate="collapsed" desc="routines">
 
 /**
  * send out the address byte and the data byte in the MAX7219 format
@@ -99,5 +113,4 @@ void MAX7219_update()
     CS = 0;	
 }
 
-
-
+// </editor-fold>

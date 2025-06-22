@@ -8,6 +8,7 @@
 */
 
 #include "aw.h"
+#include "eeprom.h"
 
 // <editor-fold defaultstate="collapsed" desc="initialisation">
 
@@ -19,12 +20,13 @@ void awInit(awCallback_t fptr)
 {
     // init servo callback function (function pointer)
     awCallback = fptr;
-
     // init of the AW ports B and C (= KAWL/KAWR switches)
     awInitPortBC();
-
     // initialisation of the servo variables
-    servoInit(&awUpdate);    
+    servoInit(&awUpdate);
+    // get last CAW state (from EEPROM)
+    getLastCawState(aw);
+    checkCawState();
 }
 
 /**
@@ -58,6 +60,36 @@ void awInitPortBC()
     TRISCbits.TRISC5 = false;
     LATCbits.LATC4 = true;
     LATCbits.LATC5 = true;
+}
+
+/**
+ * get last CAW state (from EEPROM)
+ */
+void getLastCawState(AWCON_t *aw)
+{
+        // read the CAWL and CAWR values from EEPROM
+        uint8_t CAWL_mem = eepromRead(0x0000);
+        uint8_t CAWR_mem = eepromRead(0x0001);
+        // get CAWL and CAWR
+        for (uint8_t i = 0; i < 8; i++)
+        {
+            aw[i].CAWL = (CAWL_mem & (0x01 << i)) != 0;
+            aw[i].CAWR = (CAWR_mem & (0x01 << i)) != 0;
+        }
+}
+
+void checkCawState()
+{
+    // check states of CAWL and CAWR, if CAWL and CAWR are both 'true'
+    // then set the state of CAWL and CAWR to 'false'
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        if ((aw[i].CAWL == true) && (aw[i].CAWR == true))
+        {
+            aw[i].CAWL = false;
+            aw[i].CAWR = false;
+        }
+    }   
 }
 
 // </editor-fold>
@@ -151,15 +183,23 @@ void awUpdateServo(AWCON_t *aw, uint16_t *servo, uint8_t index)
  * @param aw: pointer to the AW parameters
  * @param value: true or false (= state of CAWL)
  */
-void setCAWL(AWCON_t* aw, bool value)
+void setCAWL(AWCON_t aw[], uint8_t index, bool value)
 {
-    // set CAWL and keep old CAW value in memory
-    if (aw->CAWL == true && aw->CAWR == false)
+    // update CAWL
+    aw[index].CAWL = value;
+    // write CAW info to EEPROM (only if CAWL = 1 and CAWR = 0)
+    if (aw[index].CAWL == true && aw[index].CAWR == false)
     {
-        aw->CAWL_mem = true;
-        aw->CAWR_mem = false;
+        // read the CAWL and CAWR values
+        uint8_t CAWL_mem = eepromRead(0x0000);
+        uint8_t CAWR_mem = eepromRead(0x0001);
+        // modify the corresponding CAWL and CAWR bits
+        CAWL_mem |= (0x01 << index);
+        CAWR_mem &= ~(0x01 << index);
+        // overwrite the CAWL and CAWR values
+        eepromWrite(0x0000, CAWL_mem);
+        eepromWrite(0x0001, CAWR_mem);
     }
-    aw->CAWL = value;
 }
 
 /**
@@ -167,15 +207,22 @@ void setCAWL(AWCON_t* aw, bool value)
  * @param aw: pointer to the AW parameters
  * @param value: true or false (= state of CAWR)
  */
-void setCAWR(AWCON_t* aw, bool value)
+void setCAWR(AWCON_t aw[], uint8_t index, bool value)
 {
-    // set CAWR and keep old CAW value in memory
-    if (aw->CAWR == true && aw->CAWL == false)
+    aw[index].CAWR = value;
+    // write CAW info to EEPROM (only if CAWL = 0 and CAWR = 1)
+    if (aw[index].CAWL == false && aw[index].CAWR == true)
     {
-        aw->CAWR_mem = true;
-        aw->CAWL_mem = false;
+        // read the CAWL and CAWR values
+        uint8_t CAWL_mem = eepromRead(0x0000);
+        uint8_t CAWR_mem = eepromRead(0x0001);
+        // modify the corresponding CAWL and CAWR bits
+        CAWL_mem &= ~(0x01 << index);
+        CAWR_mem |= (0x01 << index);
+        // overwrite the CAWL and CAWR values
+        eepromWrite(0x0000, CAWL_mem);
+        eepromWrite(0x0001, CAWR_mem);
     }
-    aw->CAWR = value;
 }
 
 /**

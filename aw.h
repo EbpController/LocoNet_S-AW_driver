@@ -32,8 +32,6 @@ typedef struct
     {
         bool CAWL;
         bool CAWR;
-        bool CAWL_mem;
-        bool CAWR_mem;
         bool KAWL;
         bool KAWR;
     } AWCON_t;
@@ -44,10 +42,12 @@ typedef void (*awCallback_t)(AWCON_t*, uint8_t);
 // routines
 void awInit(awCallback_t);
 void awInitPortBC(void);
+void getLastCawState(AWCON_t aw[]);
+void checkCawState();
 void awUpdate(uint8_t);
 void awUpdateServo(AWCON_t*, uint16_t*, uint8_t);
-void setCAWL(AWCON_t*, bool);
-void setCAWR(AWCON_t*, bool);
+void setCAWL(AWCON_t aw[], uint8_t, bool);
+void setCAWR(AWCON_t aw[], uint8_t, bool);
 void setKAWL(AWCON_t*, bool, uint8_t);
 void setKAWR(AWCON_t*, bool, uint8_t);
 bool getSwitchKAWL(uint8_t);
