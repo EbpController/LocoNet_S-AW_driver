@@ -5,6 +5,7 @@
  *
  * revision history:
  *  v1.0 Creation (15/09/2024)
+ *  v1.1 Keep state of S in EEPROM, other corrections (23/08/2025)
  */
 
 // This is a guard condition so that contents of this file are not included
@@ -15,15 +16,46 @@
 #include "config.h"
 
 // definitions
-#define CVT_ON_TIME 240        // CVT on time, 600msec = 240 (with 2500us)
-#define CVT_OFF_TIME 160       // CVT off time, 400msec = 160 (with 2500us)
+#define CVT_ON_TIME 240         // CVT on time, 600msec = 240 (with 2500us)
+#define CVT_OFF_TIME 160        // CVT off time, 400msec = 160 (with 2500us)
 #define FADE_IN 5               // lamp fade IN time (higher value is faster)
 // fade time = 1000msec/value
 // (typ. value between 1 and 10)
 #define FADE_OUT 6              // lamp fade OUT time (higher value is faster)
 // fade time = 1000msec/value
 // (typ. value between 1 and 10)
-#define INTENSITY_MAX 400     // maximum value intensity
+#define INTENSITY_MAX 400       // maximum value intensity
+// aspect modes
+// 0: R
+// 1: W
+// 2: Y
+// 3: H
+// 4: V
+// 5: G
+// 6: Y + BA1
+// 7: H + BA1
+// 8: V + BA1
+// 9: G + BA1
+// 10: Y + BA2
+// 11: H + BA2
+// 12: V + BA2
+// 13: G + BA2
+// 14: Y + BA1 + BA2
+// 15: H + BA1 + BA2
+// 16: V + BA1 + BA2
+// 17: G + BA1 + BA2
+#define ASPECT_MODES 18         // total different aspect modes 
+// led positions
+#define LED_W 0x40              // W
+#define LED_YV 0x20             // YV
+#define LED_R 0x10              // R
+#define LED_G 0x08              // G
+#define LED_YH 0x04             // YH
+#define LED_BA1 0x02            // BA1
+#define LED_BA2 0x01            // BA2
+// led KFS/KOS
+#define LED_KFS 0x40            // KFS
+#define LED_KOS 0x20            // KOS
 
 typedef struct {
     uint16_t R;
@@ -43,47 +75,6 @@ typedef struct {
     bool CVT_mode;
     uint16_t periodCounter;
 } SCON_t;
-
-// B signal lookup tabel
-//  (where led W = bit 0, led YV = bit 1, led R = bit 2, led G = bit 3,
-//         led YH = bit 4, led BA1 = bit 5, led BA2 = bit 6)
-// 
-// 0: R
-// 1: W
-// 2: Y
-// 3: H
-// 4: V
-// 5: G
-// 6: Y + BA1
-// 7: H + BA1
-// 8: V + BA1
-// 9: G + BA1
-// 10: Y + BA2
-// 11: H + BA2
-// 12: V + BA2
-// 13: G + BA2
-// 14: Y + BA1 + BA2
-// 15: H + BA1 + BA2
-// 16: V + BA1 + BA2
-// 17: G + BA1 + BA2
-uint8_t aspect[18] = {0b00000100,
-    0b00000101,
-    0b00010010,
-    0b00011000,
-    0b00001010,
-    0b00001000,
-    0b00110010,
-    0b00111000,
-    0b00101010,
-    0b00101000,
-    0b01010010,
-    0b01011000,
-    0b01001010,
-    0b01001000,
-    0b01110010,
-    0b01111000,
-    0b01101010,
-    0b01101000};
 
 // servo callback definition (as function pointer)
 typedef void (*sCallback_t)(uint8_t);

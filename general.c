@@ -28,12 +28,13 @@ void init()
     sInit(&sHandler);
     // init MAX7219
     MAX7219_init();
-    // init of the hardware elements (timer, ISR, port)
+    // init of the hardware elements (timer, comparator, ISR)
     initTmr3();
     initCcp1();
     initIsr();
     // init MAX7219
     MAX7219_init();
+    // init ports (IO pins)
     initPorts();
 }
 
@@ -61,9 +62,9 @@ void initCcp1(void)
     // initialisation comparator (CCP1)
     // CCP1 wil be used to drive the servos with a specific duty-cycle
     // CCP1 must give a high priority interrupt on overflow
-    CCPTMRSbits.C1TSEL = 2; // CCP1 is based of timer 3
-    CCP1CONbits.MODE = 8; // set output mode
-    CCP1CONbits.EN = true; // enable comparator (CCP1)    
+    CCPTMRSbits.C1TSEL = 2;     // CCP1 is based of timer 3
+    CCP1CONbits.MODE = 8;       // set output mode
+    CCP1CONbits.EN = true;      // enable comparator (CCP1)    
     CCPR1 = ~(TIMER3_2500us - (servoPortD[index] * 2));
 }
 
@@ -73,16 +74,16 @@ void initCcp1(void)
 void initIsr(void)
 {
     // set global interrupt parameters
-    INTCONbits.IPEN = true; // enable priority levels on iterrupt
-    INTCONbits.GIEH = true; // enable all high priority interrupts
-    INTCONbits.GIEL = true; // enable all low priority interrupts
+    INTCONbits.IPEN = true;     // enable priority levels on iterrupt
+    INTCONbits.GIEH = true;     // enable all high priority interrupts
+    INTCONbits.GIEL = true;     // enable all low priority interrupts
     // set comparator (CCP1) interrrupt parameters
-    IPR6bits.CCP1IP = true; // comparator (CCP1) interrupt high priority
-    PIE6bits.CCP1IE = true; // enable comparator (CCP1) overflow interrupt
+    IPR6bits.CCP1IP = true;     // comparator (CCP1) interrupt high priority
+    PIE6bits.CCP1IE = true;     // enable comparator (CCP1) overflow interrupt
     // set timer 3 interrrupt parameters
-    IPR4bits.TMR3IP = false; // timer 3 interrupt low priority
-    PIE4bits.TMR3IE = true; // enable timer 3 overflow interrupt
-    T3CONbits.ON = true; // enable timer 3
+    IPR4bits.TMR3IP = false;    // timer 3 interrupt low priority
+    PIE4bits.TMR3IE = true;     // enable timer 3 overflow interrupt
+    T3CONbits.ON = true;        // enable timer 3
 }
 
 /**
@@ -97,14 +98,14 @@ void initPorts()
     // we only need to read 8 DIP switches (A0 - A7)
     // this makes the adress A3 - A10 for the complete LN address selection
     // A0 - A2 will be the index of the AW (= 8 turnouts)
-    TRISA |= 0xc3; // disable output (= input) on pin A0 - A1, A6 - A7
-    TRISC |= 0x0f; // disable output (= input) on pin C0 - C3
+    TRISA |= 0xc3;  // disable output (= input) on pin A0 - A1, A6 - A7
+    TRISC |= 0x0f;  // disable output (= input) on pin C0 - C3
 
     ANSELA &= 0x3c; // enable TTL input buffer on pin A0 - A1, A6 - A7
     ANSELC &= 0xf0; // enable TTL input buffer on pin C0 - C3
 
-    WPUA |= 0xc3; // enable pull-up on pin A0 - A1, A6 - A7
-    WPUC |= 0x0f; // enabel pull-up on pin C0 - C3
+    WPUA |= 0xc3;   // enable pull-up on pin A0 - A1, A6 - A7
+    WPUC |= 0x0f;   // enabel pull-up on pin C0 - C3
 }
 
 // </editor-fold>
@@ -164,7 +165,7 @@ void __interrupt(low_priority) isrLow(void)
         // first handle servo interrupt routine
         servoIsrTmr3(index);
         // reload timer 3
-        WRITETIMER3(~TIMER3_2500us); // set delay in timer 3
+        WRITETIMER3(~TIMER3_2500us);    // set delay in timer 3
         // set comparator (CCP1)
         CCPR1 = ~(TIMER3_2500us - (servoPortD[index] * 2));
         // at last handle signal interrupt routine
@@ -176,7 +177,7 @@ void __interrupt(low_priority) isrLow(void)
 
 // </editor-fold>
 
-// <editor-fold defaultstate="collapsed" desc="ISR (low/high priority)">
+// <editor-fold defaultstate="collapsed" desc="ISR (high priority)">
 
 // there are two possible high interrupt triggers, coming from
 // the timer 3 overrun flag and/or coming from the comparator
@@ -214,34 +215,34 @@ void updateLeds(void)
         // reset all led outputs (active low)
         ledOutput = 0x00;
         // KFS
-        if (s[i].KFS == true)
+        if (s[i].KFS)
         {
-            ledOutput |= 0x01;
+            ledOutput |= LED_KFS;
         }
         // KOS
-        if (s[i].KOS == true)
+        if (s[i].KOS)
         {
-            ledOutput |= 0x02;
+            ledOutput |= LED_KOS;
         }
         // CAWL
-        if (aw[i].CAWL == true)
+        if (aw[i].CAWL)
         {
-            ledOutput |= 0x20;
+            ledOutput |= LED_CAWL;
         }
         // KAWL
-        if (aw[i].KAWL == true)
+        if (aw[i].KAWL)
         {
-            ledOutput |= 0x10;
+            ledOutput |= LED_KAWL;
         }
         // CAWR
-        if (aw[i].CAWR == true)
+        if (aw[i].CAWR)
         {
-            ledOutput |= 0x40;
+            ledOutput |= LED_CAWR;
         }
         // KAWR
-        if (aw[i].KAWR == true)
+        if (aw[i].KAWR)
         {
-            ledOutput |= 0x80;
+            ledOutput |= LED_KAWR;
         }
         // send signal state to led outputs
         MAX7219_send(i + 1, ledOutput);
@@ -254,41 +255,40 @@ void updateLeds(void)
         // W
         if (s[i].intensity.W >= pwmCounter)
         {
-            ledOutput |= 0x80;
+            ledOutput |= LED_W;
         }
         // YV
         if (s[i].intensity.YV >= pwmCounter)
         {
-            ledOutput |= 0x40;
+            ledOutput |= LED_YV;
         }
         // R
         if (s[i].intensity.R >= pwmCounter)
         {
-            ledOutput |= 0x20;
+            ledOutput |= LED_R;
         }
         // G
         if (s[i].intensity.G >= pwmCounter)
         {
-            ledOutput |= 0x10;
+            ledOutput |= LED_G;
         }
         // YH
         if (s[i].intensity.YH >= pwmCounter)
         {
-            ledOutput |= 0x08;
+            ledOutput |= LED_YH;
         }
         // BA1
         if (s[i].intensity.BA1 >= pwmCounter)
         {
-            ledOutput |= 0x04;
+            ledOutput |= LED_BA1;
         }
         // BA2
         if (s[i].intensity.BA2 >= pwmCounter)
         {
-            ledOutput |= 0x02;
+            ledOutput |= LED_BA2;
         }
         // send signal state to led outputs
         MAX7219_send(i + 1, ledOutput);
-
         // update
         MAX7219_update();
     }

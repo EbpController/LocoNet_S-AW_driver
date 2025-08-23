@@ -5,6 +5,7 @@
  *
  * revision history:
  *  v1.0 Creation (15/09/2024)
+ *  v1.1 Keep state of S in EEPROM, other corrections (23/08/2025)
  */
 
 #include "s.h"
@@ -414,6 +415,7 @@ void writeS(uint8_t aspect, bool CVT_mode, uint8_t index)
     {
         aspect |= 0x80;
     }
+    // keep aspect in EEPROM
     eepromWrite((uint16_t) (index + 2), aspect);
 }
 
@@ -444,7 +446,7 @@ bool isAspectValid(uint8_t oldAspect, uint8_t newAspect)
 
     // 1. check the size of the aspect array
     //    the value must be < the size of the aspect array
-    if (newAspect > (sizeof (aspect) / sizeof (aspect[0])))
+    if (newAspect >= ASPECT_MODES)
     {
         return false;
     }
