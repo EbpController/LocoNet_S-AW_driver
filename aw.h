@@ -36,6 +36,9 @@
 #define SWITCH_KAWL LATC5           // SWITCH KAWL
 #define SWITCH_CAWR LATC4           // SWITCH CAWR
 #define SWITCH_KAWR LATC4           // SWITCH KAWR
+// EEPROM addresses
+#define ADRS_KAWL 0x0000            // EEPROM address KAWL
+#define ADRS_KAWR 0x0001            // EEPROM address KAWR
 
 #define CAW_CONTROL
 // #define KAW_CONTROL
@@ -55,8 +58,8 @@ typedef void (*awCallback_t)(AWCON_t*, uint8_t);
 // routines
 void awInit(awCallback_t);
 void awInitPortBC(void);
-void getLastCawState(AWCON_t aw[]);
-void checkCawState();
+void getLastAwState(void);
+void checkCawState(void);
 void awUpdate(uint8_t);
 void awUpdateServo(AWCON_t*, uint16_t*, uint8_t);
 void setCAWL(AWCON_t*, uint8_t, bool);
@@ -71,6 +74,6 @@ bool getSwitchCAWR(uint8_t);
 
 // variables
 awCallback_t awCallback;
-AWCON_t aw[8];
+AWCON_t awList[8];
 
 #endif	/* AW_H */

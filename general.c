@@ -225,22 +225,22 @@ void updateLeds(void)
             ledOutput |= LED_KOS;
         }
         // CAWL
-        if (aw[i].CAWL)
+        if (awList[i].CAWL)
         {
             ledOutput |= LED_CAWL;
         }
         // KAWL
-        if (aw[i].KAWL)
+        if (awList[i].KAWL)
         {
             ledOutput |= LED_KAWL;
         }
         // CAWR
-        if (aw[i].CAWR)
+        if (awList[i].CAWR)
         {
             ledOutput |= LED_CAWR;
         }
         // KAWR
-        if (aw[i].KAWR)
+        if (awList[i].KAWR)
         {
             ledOutput |= LED_KAWR;
         }
@@ -319,13 +319,13 @@ void lnRxMessageHandler(lnQueue_t* lnRxMsg)
                 {
                     if ((lnRxMsg->values[(lnRxMsg->head + 2) % QUEUE_SIZE] & 0x20) == 0x20)
                     {
-                        setCAWL(aw, index, true);
-                        setCAWR(aw, index, false);
+                        setCAWL(awList, index, true);
+                        setCAWR(awList, index, false);
                     }
                     else
                     {
-                        setCAWL(aw, index, false);
-                        setCAWR(aw, index, true);
+                        setCAWL(awList, index, false);
+                        setCAWR(awList, index, true);
                     }
                 }
                 break;
@@ -335,15 +335,15 @@ void lnRxMessageHandler(lnQueue_t* lnRxMsg)
                 // global power OFF request
                 for (uint8_t index = 0; index < 8; index++)
                 {
-                    setCAWL(aw, index, false);
-                    setCAWR(aw, index, false);
+                    setCAWL(awList, index, false);
+                    setCAWR(awList, index, false);
                 }
                 break;
             }
             case 0x83:
             {
                 // global power ON request
-                getLastCawState(aw);
+                getLastAwState();
                 break;
             }
             case 0xed:
