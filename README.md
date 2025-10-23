@@ -24,10 +24,10 @@ For the 8 signals, a MAX7219 driver is used, which is connected to the following
  - CLK: pin 28 (RE1)
  - CS: pin 29 (RE2)
 
-For the 8 turnouts a servo could be connected on pins 0 to 7. Optionaly a switch could be connected on pins 8 to 15 for controlling the state of the turnout.
-This switches can be exist for the left position (KAWL) and/or for the right position (KAWR). The common powerline for the switches are:
- - common KAWL line: pin 25 (RC4)
- - common KAWR line: pin 26 (RC5)
+For the 8 turnouts a servo could be connected on pins 0 to 7. Optionaly a switch or button could be connected on pins 8 to 15 for controlling the state of the turnout (KAW mode or CAW mode = default). 
+The switches/buttons can be exist for the left position (KAWL/CAWL) and/or for the right position (KAWR/CAWR). The common powerline for the switches are:
+ - common KAWL/CAWL line: pin 25 (RC4)
+ - common KAWR/CAWR line: pin 26 (RC5)
 
 Definition of the LocoNet protocol to drive the turnouts and the signal aspects or to receive the turnout and signal status:
  - turnout request (OPC_SW_REQ = 0xb0), request 'left' or 'right'
