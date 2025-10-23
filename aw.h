@@ -6,7 +6,7 @@
  * revision history:
  *  v1.0 Creation (16/08/2024)
  *  v1.1 Add CAW control, keep state of AW in EEPROM (23/08/2025)
-*/
+ */
 
 // This is a guard condition so that contents of this file are not included
 // more than once.  
@@ -15,6 +15,7 @@
 
 #include "config.h"
 #include "servo.h"
+#include "eeprom.h"
 
 // definitions
 // sweeptime time in ms from min/max to max/min position
@@ -37,43 +38,48 @@
 #define SWITCH_CAWR LATC4           // SWITCH CAWR
 #define SWITCH_KAWR LATC4           // SWITCH KAWR
 // EEPROM addresses
-#define ADRS_KAWL 0x0000            // EEPROM address KAWL
-#define ADRS_KAWR 0x0001            // EEPROM address KAWR
+#define ADRS_CAWL 0x0000            // EEPROM address KAWL
+#define ADRS_CAWR 0x0001            // EEPROM address KAWR
 
 #define CAW_CONTROL
 // #define KAW_CONTROL
 
 // AW status register
-typedef struct
-    {
-        bool CAWL;
-        bool CAWR;
-        bool KAWL;
-        bool KAWR;
-    } AWCON_t;
 
-// AW callback definition (as function pointer)
-typedef void (*awCallback_t)(AWCON_t*, uint8_t);
+typedef struct {
+    bool CAWL;
+    bool CAWR;
+    bool KAWL;
+    bool KAWR;
+    bool KAWL_lastState;
+    bool KAWR_lastState;
+} AWCON_t;
 
-// routines
-void awInit(awCallback_t);
+// AW callback definitions (as function pointer)
+typedef void (*awCawCallback_t)(uint8_t, bool);
+typedef void (*awKawCallback_t)(uint8_t);
+
+// initialisation
+void awInit(awCawCallback_t, awKawCallback_t);
 void awInitPortBC(void);
 void getLastAwState(void);
-void checkCawState(void);
+
+// routines
 void awUpdate(uint8_t);
-void awUpdateServo(AWCON_t*, uint16_t*, uint8_t);
-void setCAWL(AWCON_t*, uint8_t, bool);
-void setCAWR(AWCON_t*, uint8_t, bool);
-void setKAWL(AWCON_t*, uint8_t, bool);
-void setKAWR(AWCON_t*, uint8_t, bool);
+void awUpdateServo(uint16_t*, uint8_t);
+void setCAWL(uint8_t, bool);
+void setCAWR(uint8_t, bool);
+void setKAWL(uint8_t, bool);
+void setKAWR(uint8_t, bool);
 bool getSwitchKAWL(uint8_t);
 bool getSwitchKAWR(uint8_t);
-void checkSwitchesCAW(AWCON_t*, uint8_t);
+void checkSwitchesCAW(uint8_t);
 bool getSwitchCAWL(uint8_t);
 bool getSwitchCAWR(uint8_t);
 
 // variables
-awCallback_t awCallback;
+awCawCallback_t awCawCallback;
+awKawCallback_t awKawCallback;
 AWCON_t awList[8];
 
 #endif	/* AW_H */

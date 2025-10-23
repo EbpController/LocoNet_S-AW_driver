@@ -1,12 +1,13 @@
 /* 
  * file: ln.h
  * author: J. van Hooydonk
- * comments: LocoNet driver, following the project of G. Giebens https://github.com/GeertGiebens
+ * comments: LocoNet driver
  *
  * revision history:
  *  v0.1 Creation (14/01/2024)
  *  v1.0 Merge PIC18F2525/2620/4525/4620 and PIC18F24/25/26/27/45/46/47Q10 microcontrollers (20/07/2024)
  *  v1.1 Remove PIC18F2525/2620/4525/4620 (obsolete processor)
+ *  v2.0 complete rework of LocoNet driver after some major bugs
  */
 
 // this is a guard condition so that contents of this file are not included
@@ -14,31 +15,31 @@
 #ifndef LN_H
 #define	LN_H
 
-#include "config.h"
 #include "circular_queue.h"
 
 // definitions
-#define LINEBREAK_LONG 1800U
+#define LINEBREAK_LONG 2500U
 #define LINEBREAK_SHORT 600U
 #define TIMER1_IDLE 2000U
-#define DELAY_60US 42U
 
-#define LN_RX_TX_LED false
+typedef enum {
+    IDLE,
+    CMP,
+    LINEBREAK,
+    TX
+} lnMode;
 
 // LN flag register
-typedef struct
-    {
-        unsigned TMR1_MODE :2;      // 0 = idle
-                                    // 1 = running CMP delay
-                                    // 2 = running linebreak
-                                    // 3 = running synchronisation BRG
-    } LNCON_t;
+
+typedef struct {
+    lnMode LN_MODE;
+} LNCON_t;
 LNCON_t LNCON;
 
 // LN RX message callback definition (as function pointer)
 typedef void (*lnRxMsgCallback_t)(lnQueue_t*);
 
-// LN routines
+// LN init routines
 void lnInit(lnRxMsgCallback_t);
 void lnInitCmp1(void);
 void lnInitEusart1(void);
@@ -46,33 +47,41 @@ void lnInitTmr1(void);
 void lnInitIsr(void);
 void lnInitLeds(void);
 
+// LN timer 1 routines
 void lnIsrTmr1(void);
-void lnIsrRcError(void);
-void lnIsrRc(void);
-
-void rxHandler(uint8_t);
-
-void lnTxMessageHandler(lnQueue_t*);
-void startLnTxMessage(void);
-void txHandler(void);
-bool isChecksumCorrect(lnQueue_t*);
-
-bool isLnFree(void);
-
 void startIdleDelay(void);
 void startCmpDelay(void);
 void startLinebreak(uint16_t);
-void startSyncBrg1(void);
-void setBrg1(void);
-
 uint16_t getRandomValue(uint16_t);
+
+// LN RX routines
+void lnIsrRc(uint8_t);
+void rxHandler(uint8_t);
+
+// LN TX routines
+void lnIsrTx(void);
+void lnTxMessageHandler(lnQueue_t*);
+void startLnTxMessage(void);
+void sendTxByte(void);
+void setTxMode(void);
+
+// LN aux. routines
+bool isLnFree(void);
+void enableEusartPort(void);
+void disableEusartPort(void);
+bool isChecksumCorrect(lnQueue_t*);
+void removeLastLnMessageFromQueue(lnQueue_t*);
+
+// LN mode (IDLE, CMP, Linebreak, TX, ...)
 
 // LN used variables
 lnRxMsgCallback_t lnRxMsgCallback;
-uint8_t _;                          // dummy variable
-uint16_t lastRandomValue;           // initial value for the random generator
+uint16_t lastRandomValue; // initial value for the random generator
+uint8_t _; // dummy variable
+
 lnQueue_t lnTxQueue;
 lnQueue_t lnTxTempQueue;
+lnQueue_t lnTxCompQueue;
 lnQueue_t lnRxQueue;
 lnQueue_t lnRxTempQueue;
 

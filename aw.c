@@ -9,7 +9,6 @@
  */
 
 #include "aw.h"
-#include "eeprom.h"
 
 // <editor-fold defaultstate="collapsed" desc="initialisation">
 
@@ -17,17 +16,16 @@
  * AW driver initialisation
  * @param fptr: the function pointer to the (callback) AW handler
  */
-void awInit(awCallback_t fptr)
+void awInit(awCawCallback_t fptrCaw, awKawCallback_t fptrKaw)
 {
-    // init servo callback function (function pointer)
-    awCallback = fptr;
+    // init servo callback function (function pointer for Caw)
+    awCawCallback = fptrCaw;
+    // init servo callback function (function pointer for Kaw)
+    awKawCallback = fptrKaw;
     // init of the AW ports B and C (= KAWL/KAWR switches)
     awInitPortBC();
     // initialisation of the servo variables
     servoInit(&awUpdate);
-    // get last CAW state (from EEPROM)
-    getLastAwState();
-    checkCawState();
 }
 
 /**
@@ -64,28 +62,17 @@ void awInitPortBC()
 }
 
 /**
- * get last CAW state (from EEPROM)
+ * get last KAW states
  */
 void getLastAwState()
 {
-    // read the KAWL and KAWR values from EEPROM
-    uint8_t KAWL_mem = eepromRead(ADRS_KAWL);
-    uint8_t KAWR_mem = eepromRead(ADRS_KAWR);
-    // get CAWL and CAWR
+    // get last state of KAWL and KAWR and put them in the CAW
     for (uint8_t i = 0; i < 8; i++)
     {
-        awList[i].CAWL = (KAWL_mem & (0x01 << i)) != 0;
-        awList[i].CAWR = (KAWR_mem & (0x01 << i)) != 0;
-    }
-}
+        awList[i].CAWL = awList[i].KAWL_lastState;
+        awList[i].CAWR = awList[i].KAWR_lastState;
 
-void checkCawState()
-{
-    // check states of CAWL and CAWR, if CAWL and CAWR are both 'true'
-    // then set the state of CAWL and CAWR to 'false'
-    for (uint8_t i = 0; i < 8; i++)
-    {
-        if ((awList[i].CAWL == true) && (awList[i].CAWR == true))
+        if (awList[i].CAWL && awList[i].CAWR)
         {
             awList[i].CAWL = false;
             awList[i].CAWR = false;
@@ -104,10 +91,13 @@ void checkCawState()
 void awUpdate(uint8_t index)
 {
     // update servo on port D
-    awUpdateServo(&awList[index], &servoPortD[index], index);
+    awUpdateServo(&servoPortD[index], index);
 #ifdef CAW_CONTROL
-    // check switches CAW
-    checkSwitchesCAW(&awList[index], index);
+    if (index < 4)
+    {
+        // check switches CAW
+        checkSwitchesCAW(index);
+    }
 #endif
 }
 
@@ -117,14 +107,14 @@ void awUpdate(uint8_t index)
  * @param servo: pointer to the servo
  * @param index: the index of AW in the AW list
  */
-void awUpdateServo(AWCON_t *aw, uint16_t *servo, uint8_t index)
+void awUpdateServo(uint16_t *servo, uint8_t index)
 {
     // increment pulse width with gradient depending on state of CAW
-    if (aw->CAWL == aw->CAWR)
+    if (awList[index].CAWL == awList[index].CAWR)
     {
         // if CAWL = CAWR clear KAWs and set the servo position in the middle 
-        setKAWL(aw, index, false);
-        setKAWR(aw, index, false);
+        setKAWL(index, false);
+        setKAWR(index, false);
         if (*servo > ((SERVO_MAX + SERVO_MIN) / 2) + GRADIENT)
         {
             *servo -= GRADIENT;
@@ -137,46 +127,46 @@ void awUpdateServo(AWCON_t *aw, uint16_t *servo, uint8_t index)
     else
     {
         // if CAWL then clear KAWR and set servo left
-        if (aw->CAWL)
+        if (awList[index].CAWL)
         {
-            setKAWR(aw, index, false);
+            setKAWR(index, false);
             if (getSwitchKAWL(index))
             {
-                setKAWL(aw, index, true);
+                setKAWL(index, true);
             }
             else
             {
                 if (*servo > (SERVO_MAX - GRADIENT))
                 {
                     *servo = SERVO_MAX;
-                    setKAWL(aw, index, true);
+                    setKAWL(index, true);
                 }
                 else
                 {
                     *servo += GRADIENT;
-                    setKAWL(aw, index, false);
+                    setKAWL(index, false);
                 }
             }
         }
         // if CAWR then clear KAWL and set servo right
-        if (aw->CAWR)
+        if (awList[index].CAWR)
         {
-            setKAWL(aw, index, false);
+            setKAWL(index, false);
             if (getSwitchKAWR(index))
             {
-                setKAWR(aw, index, true);
+                setKAWR(index, true);
             }
             else
             {
                 if (*servo < SERVO_MIN + GRADIENT)
                 {
                     *servo = SERVO_MIN;
-                    setKAWR(aw, index, true);
+                    setKAWR(index, true);
                 }
                 else
                 {
                     *servo -= GRADIENT;
-                    setKAWR(aw, index, false);
+                    setKAWR(index, false);
                 }
             }
         }
@@ -185,84 +175,62 @@ void awUpdateServo(AWCON_t *aw, uint16_t *servo, uint8_t index)
 
 /**
  * set the property CAWL
- * @param aw: pointer to the AW parameters
  * @param index: the index of AW in the AW list
  * @param value: true or false (= state of CAWL)
  */
-void setCAWL(AWCON_t *aw, uint8_t index, bool value)
+void setCAWL(uint8_t index, bool value)
 {
     // update CAWL
-    aw->CAWL = value;
+    awList[index].CAWL = value;
 }
 
 /**
  * set the property CAWR
- * @param aw: pointer to the AW parameters
  * @param index: the index of AW in the AW list
  * @param value: true or false (= state of CAWR)
  */
-void setCAWR(AWCON_t *aw, uint8_t index, bool value)
+void setCAWR(uint8_t index, bool value)
 {
-    aw->CAWR = value;
+    awList[index].CAWR = value;
 }
 
 /**
  * set the property KAWL
- * @param aw: pointer to the AW parameters
  * @param index: the index of AW in the AW list
  * @param value: true or false (= state of KAWL)
  */
-void setKAWL(AWCON_t *aw, uint8_t index, bool value)
+void setKAWL(uint8_t index, bool value)
 {
     // set KAWL
-    if (aw->KAWL != value)
+    if (awList[index].KAWL != value)
     {
-        aw->KAWL = value;
+        awList[index].KAWL = value;
         // handle the changed KAW state (in the callback function)
-        (*awCallback)(aw, index);
-        // write KAW info to EEPROM (only if KAWL = 1)
-        if (aw->KAWL)
-        {
-            // read the CAWL and CAWR values
-            uint8_t KAWL_mem = eepromRead(ADRS_KAWL);
-            uint8_t KAWR_mem = eepromRead(ADRS_KAWR);
-            // modify the corresponding KAWL and KAWR bits
-            KAWL_mem |= (0x01 << index);
-            KAWR_mem &= ~(0x01 << index);
-            // overwrite the KAWL and KAWR values
-            eepromWrite(ADRS_KAWL, KAWL_mem);
-            eepromWrite(ADRS_KAWR, KAWR_mem);
-        }
+        (*awKawCallback)(index);
+        // hold  last state of KAWL in memory
+        awList[index].KAWL_lastState = value;
+        // update EEPROM data
+        updateEepromData(index);
     }
 }
 
 /**
  * set the property KAWR
- * @param aw: pointer to the AW parameters
  * @param index: the index of AW in the AW list
  * @param value: true or false (= state of KAWR)
  */
-void setKAWR(AWCON_t *aw, uint8_t index, bool value)
+void setKAWR(uint8_t index, bool value)
 {
     // set KAWR
-    if (aw->KAWR != value)
+    if (awList[index].KAWR != value)
     {
-        aw->KAWR = value;
+        awList[index].KAWR = value;
         // handle the changed KAW state (in the callback function)
-        (*awCallback)(aw, index);
-        // write KAW info to EEPROM (only if KAWR = 1)
-        if (aw->KAWR)
-        {
-            // read the KAWL and KAWR values
-            uint8_t KAWL_mem = eepromRead(ADRS_KAWL);
-            uint8_t KAWR_mem = eepromRead(ADRS_KAWR);
-            // modify the corresponding KAWL and KAWR bits
-            KAWL_mem &= ~(0x01 << index);
-            KAWR_mem |= (0x01 << index);
-            // overwrite the KAWL and KAWR values
-            eepromWrite(ADRS_KAWL, KAWL_mem);
-            eepromWrite(ADRS_KAWR, KAWR_mem);
-        }
+        (*awKawCallback)(index);
+        // hold  last state of KAWR in memory
+        awList[index].KAWR_lastState = value;
+        // update EEPROM data
+        updateEepromData(index);
     }
 }
 
@@ -316,27 +284,26 @@ bool getSwitchKAWR(uint8_t index)
 
 /**
  * check the switches CAWL and CAWR
- * @param aw: pointer to the AW parameters
  * @param index: the index of AW in the AW list
  */
-void checkSwitchesCAW(AWCON_t *aw, uint8_t index)
+void checkSwitchesCAW(uint8_t index)
 {
     // check if switch CAWL is pressed
-    if (!aw->CAWL)
+    if (!awList[index].CAWL)
     {
         if (getSwitchCAWL(index))
         {
-            setCAWL(aw, index, true);
-            setCAWR(aw, index, false);
+            // handle the CAWL state (in the callback function)
+            (*awCawCallback)(index, true);
         }
     }
     // check if switch CAWR is pressed
-    if (!aw->CAWR)
+    if (!awList[index].CAWR)
     {
         if (getSwitchCAWR(index))
         {
-            setCAWR(aw, index, true);
-            setCAWL(aw, index, false);
+            // handle the CAWR state (in the callback function)
+            (*awCawCallback)(index, false);
         }
     }
 }
@@ -352,7 +319,8 @@ bool getSwitchCAWL(uint8_t index)
 
     // enable CAWL line (active low)
     LATCbits.SWITCH_CAWL = false;
-    // get CAWL switch state
+    // get CAWL switch state and check that CAWR is true
+    //  to prevent that the 2 switches are pressed at the same time
     if ((PORTB & (1 << index)) == 0)
     {
         value = true;
@@ -375,7 +343,8 @@ bool getSwitchCAWR(uint8_t index)
 
     // enable CAWR line (active low)
     LATCbits.SWITCH_CAWR = false;
-    // get CAWR switch state
+    // get CAWR switch state and check that CAWL is true
+    //  to prevent that the 2 switches are pressed at the same time
     if ((PORTB & (1 << index)) == 0)
     {
         value = true;

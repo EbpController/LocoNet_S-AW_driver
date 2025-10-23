@@ -31,14 +31,15 @@
 #define CLK RE1
 #define CS RE2
 
-// define functions
+// initialisation
 void MAX7219_init(void);
+
+// routines
 void MAX7219_send(uint8_t a, uint8_t d);
 void MAX7219_update(void);
 
 // default brightness
 uint8_t brightness = 15;
-
 
 #endif	/* MAX7219_H */
 

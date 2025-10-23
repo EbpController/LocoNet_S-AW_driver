@@ -17,10 +17,11 @@
 // servo callback definition (as function pointer)
 typedef void (*servoCallback_t)(uint8_t);
 
-// routines
+// initialisation
 void servoInit(servoCallback_t);
 void servoInitPortD(void);
 
+// ISR routines
 void servoIsrTmr3(uint8_t);
 void servoIsrCcp1(void);
 

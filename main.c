@@ -21,6 +21,7 @@ void main(void)
     // main loop
     while (true)
     {
+        updateLeds();
     }
     return;
 }

@@ -5,7 +5,7 @@
  *
  * revision history:
  *  v1.0 Creation (16/08/2024)
-*/
+ */
 
 #include "servo.h"
 
@@ -14,7 +14,7 @@
 /**
  * servo motor driver initialisation
  * @param fptr: the function pointer to the (callback) servo handler
-*/
+ */
 void servoInit(servoCallback_t fptr)
 {
     // init servo callback function (function pointer)
@@ -25,7 +25,7 @@ void servoInit(servoCallback_t fptr)
     {
         servoPortD[i] = 1500U;
     }
-    
+
     // init of the other elements (timer, comparator, IST, port)
     servoInitPortD();
 }
@@ -36,15 +36,13 @@ void servoInit(servoCallback_t fptr)
 void servoInitPortD(void)
 {
     // port D
-    TRISD = 0x00;               // configure all pins of port D as output
-    LATD = 0x00;                // set them to 0    
+    TRISD = 0x00; // configure all pins of port D as output
+    LATD = 0x00; // set them to 0    
 }
 
 // </editor-fold>
 
-// <editor-fold defaultstate="collapsed" desc="ISR">
-
-// <editor-fold defaultstate="collapsed" desc="ISR timer 3">
+// <editor-fold defaultstate="collapsed" desc="ISR routines">
 
 /**
  * interrupt routine for timer 3
@@ -54,12 +52,8 @@ void servoIsrTmr3(uint8_t index)
     // get servo values (in the callback function)
     (*servoCallback)(index);
     // toggle output port D pin[index]
-    LATD = (uint8_t)(0x01 << index);
+    LATD = (uint8_t) (0x01 << index);
 }
-
-// </editor-fold>
-
-// <editor-fold defaultstate="collapsed" desc="ISR comparator (CCP1 and CCP2)">
 
 /**
  * interrupt routine for comparator (CCP1)
@@ -69,7 +63,5 @@ void servoIsrCcp1(void)
     // set (all) pin(s) of port D to 0
     LATD = 0x00;
 }
-
-// </editor-fold>
 
 // </editor-fold>

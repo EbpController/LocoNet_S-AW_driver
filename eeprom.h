@@ -13,10 +13,21 @@
 #define	EEPROM_H
 
 #include "config.h"
+#include "aw.h"
+#include "s.h"
+
+// initialisation
+void initEeprom(void);
+void initHlvd(void);
 
 // routines
-void eepromWrite(uint16_t, uint8_t);
+void updateEepromData(uint8_t);
+void readEepromData(void);
 uint8_t eepromRead(uint16_t);
-bool eepromVerify(uint16_t, uint8_t);
+void writeEepromData(void);
+void eepromWrite(uint16_t, uint8_t);
+
+// variables
+uint8_t eepromData[8];
 
 #endif	/* EEPROM_H */

@@ -18,12 +18,16 @@ void init()
 {
     index = 0;
 
+    // after start-up, add a small delay before made the initialisation
+    __delay_ms(100);
+    // init EEPROM
+    initEeprom();
     // init the LN driver and give the function pointer for the callback
     lnInit(&lnRxMessageHandler);
     // init a temporary LN message queue for transmitting a LN message
     initQueue(&lnTxMsg);
     // init the aw driver
-    awInit(&awHandler);
+    awInit(&awCawHandler, &awKawHandler);
     // init Belgium signal driver
     sInit(&sHandler);
     // init MAX7219
@@ -35,7 +39,9 @@ void init()
     // init MAX7219
     MAX7219_init();
     // init ports (IO pins)
-    initPorts();
+    initPorts();    
+    // get previous values of AW and S from EEPROM
+    readEepromData();
 }
 
 /**
@@ -61,10 +67,10 @@ void initCcp1(void)
 {
     // initialisation comparator (CCP1)
     // CCP1 wil be used to drive the servos with a specific duty-cycle
-    // CCP1 must give a high priority interrupt on overflow
-    CCPTMRSbits.C1TSEL = 2;     // CCP1 is based of timer 3
-    CCP1CONbits.MODE = 8;       // set output mode
-    CCP1CONbits.EN = true;      // enable comparator (CCP1)    
+    // CCP1 must give a high priority interrupt on overflow !
+    CCPTMRSbits.C1TSEL = 2; // CCP1 is based of timer 3
+    CCP1CONbits.MODE = 8; // set output mode
+    CCP1CONbits.EN = true; // enable comparator (CCP1)    
     CCPR1 = ~(TIMER3_2500us - (servoPortD[index] * 2));
 }
 
@@ -74,16 +80,16 @@ void initCcp1(void)
 void initIsr(void)
 {
     // set global interrupt parameters
-    INTCONbits.IPEN = true;     // enable priority levels on iterrupt
-    INTCONbits.GIEH = true;     // enable all high priority interrupts
-    INTCONbits.GIEL = true;     // enable all low priority interrupts
+    INTCONbits.IPEN = true; // enable priority levels on iterrupt
+    INTCONbits.GIEH = true; // enable all high priority interrupts
+    INTCONbits.GIEL = true; // enable all low priority interrupts
     // set comparator (CCP1) interrrupt parameters
-    IPR6bits.CCP1IP = true;     // comparator (CCP1) interrupt high priority
-    PIE6bits.CCP1IE = true;     // enable comparator (CCP1) overflow interrupt
+    IPR6bits.CCP1IP = true; // comparator (CCP1) interrupt high priority
+    PIE6bits.CCP1IE = true; // enable comparator (CCP1) overflow interrupt
     // set timer 3 interrrupt parameters
-    IPR4bits.TMR3IP = false;    // timer 3 interrupt low priority
-    PIE4bits.TMR3IE = true;     // enable timer 3 overflow interrupt
-    T3CONbits.ON = true;        // enable timer 3
+    IPR4bits.TMR3IP = false; // timer 3 interrupt low priority
+    PIE4bits.TMR3IE = true; // enable timer 3 overflow interrupt
+    T3CONbits.ON = true; // enable timer 3
 }
 
 /**
@@ -98,81 +104,14 @@ void initPorts()
     // we only need to read 8 DIP switches (A0 - A7)
     // this makes the adress A3 - A10 for the complete LN address selection
     // A0 - A2 will be the index of the AW (= 8 turnouts)
-    TRISA |= 0xc3;  // disable output (= input) on pin A0 - A1, A6 - A7
-    TRISC |= 0x0f;  // disable output (= input) on pin C0 - C3
+    TRISA |= 0xc3; // disable output (= input) on pin A0 - A1, A6 - A7
+    TRISC |= 0x0f; // disable output (= input) on pin C0 - C3
 
     ANSELA &= 0x3c; // enable TTL input buffer on pin A0 - A1, A6 - A7
     ANSELC &= 0xf0; // enable TTL input buffer on pin C0 - C3
 
-    WPUA |= 0xc3;   // enable pull-up on pin A0 - A1, A6 - A7
-    WPUC |= 0x0f;   // enabel pull-up on pin C0 - C3
-}
-
-// </editor-fold>
-
-// <editor-fold defaultstate="collapsed" desc="ISR low priority">
-
-// there are two possible low interrupt triggers, coming from
-// the EUSART data receiver and/or coming from the timer 1 overrun flag
-
-/**
- * low priority interrupt service routine
- */
-void __interrupt(low_priority) isrLow(void)
-{
-    if (PIR4bits.TMR1IF)
-    {
-        // timer 1 interrupt
-        // clear the interrupt flag and handle the request
-        PIR4bits.TMR1IF = false;
-        lnIsrTmr1();
-    }
-    if (PIR3bits.RC1IF)
-    {
-        // EUSART RC interupt
-        if (RC1STAbits.FERR)
-        {
-            // EUSART framing error (linebreak detected)
-            // read RCREG to clear the interrupt flag and FERR bit
-            _ = RC1REG;
-            // retreive (recover) the last transmitted LN message
-            recoverLnMessage(&lnTxTempQueue);
-            // this framing error detection takes about 600탎
-            // (10bits x 60탎) and a linebreak duration is specified at
-            // 900탎, so add 300탎 after this detection time to complete
-            // a full linebreak
-            startLinebreak(LINEBREAK_SHORT);
-        }
-        else
-        {
-            // EUSART data received
-            // handle the received data byte
-            lnIsrRc();
-        }
-    }
-    if (PIR4bits.TMR3IF)
-    {
-        // timer 3 interrupt
-        // increment index
-        index++;
-        if (index == 8)
-        {
-            index = 0;
-        }
-
-        // clear the interrupt flag and handle the request
-        PIR4bits.TMR3IF = false;
-        // first handle servo interrupt routine
-        servoIsrTmr3(index);
-        // reload timer 3
-        WRITETIMER3(~TIMER3_2500us);    // set delay in timer 3
-        // set comparator (CCP1)
-        CCPR1 = ~(TIMER3_2500us - (servoPortD[index] * 2));
-        // at last handle signal interrupt routine
-        sIsrTmr3();
-        // update leds
-        updateLeds();
-    }
+    WPUA |= 0xc3; // enable pull-up on pin A0 - A1, A6 - A7
+    WPUC |= 0x0f; // enabel pull-up on pin C0 - C3
 }
 
 // </editor-fold>
@@ -195,6 +134,89 @@ void __interrupt(high_priority) isrHigh(void)
         // handle interrupt routines
         servoIsrCcp1();
     }
+    if (PIR2bits.HLVDIF)
+    {
+        // high-low voltage detector (HLVD) interrupt
+        // at power down, disable all the interrupts and focus on writing EEPROM
+        di();
+        // clear the interrupt flag and handle the request
+        PIR2bits.HLVDIF = false;
+        // store immediately all data to EEPROM
+        writeEepromData();
+    }
+}
+
+// </editor-fold>
+
+// <editor-fold defaultstate="collapsed" desc="ISR low priority">
+
+// there are two possible low interrupt triggers, coming from
+// the EUSART data receiver and/or coming from the timer 1 overrun flag
+
+/**
+ * low priority interrupt service routine
+ */
+void __interrupt(low_priority) isrLow(void)
+{
+    // ATTENTION !!!
+    // THE MAXIMUM TIME OF THIS ROUTINE SHOULD NOT EXCEED 600uS !!!
+    // this is the time of the EUSART to receive 1 byte
+    // otherwise it is possible the EUSART recieve buffer becomes is an overload
+    if (PIE4bits.TMR1IE && PIR4bits.TMR1IF)
+    {
+        // timer 1 interrupt
+        // clear the interrupt flag and handle the request
+        PIR4bits.TMR1IF = false;
+        lnIsrTmr1();
+    }
+    if (PIE3bits.TX1IE && PIR3bits.TX1IF)
+    {
+        // EUSART TX interrupt
+        lnIsrTx();
+    }
+    if (PIE3bits.RC1IE && PIR3bits.RC1IF)
+    {
+         // EUSART RC interrupt
+        if (RC1STAbits.FERR || RC1STAbits.OERR)
+        {
+            // EUSART framing error (linebreak detected) or overrun error
+            // read RCREG to clear the interrupt flag and FERR bit
+             _ = RC1REG;
+            // OERR can be cleared by resetting the serial port
+             RC1STAbits.SPEN = false;
+             RC1STAbits.SPEN = true;
+            // this framing error detection takes about 600탎
+            // (10bits x 60탎) and a linebreak duration is specified at
+            // 900탎, so add 300탎 after this detection time to complete
+            // a full linebreak
+            startLinebreak(LINEBREAK_LONG);
+        }
+        else
+        {
+            // EUSART data received
+            // handle the received data
+            lnIsrRc(RC1REG);
+        }
+    }
+    if (PIE4bits.TMR3IE && PIR4bits.TMR3IF)
+    {    
+        // timer 3 interrupt
+        // clear the interrupt flag and handle the request
+        PIR4bits.TMR3IF = false;
+
+        // increment index
+        index++;
+        index &= 0x07;
+
+        // first handle servo interrupt routine
+        servoIsrTmr3(index);
+        // reload timer 3
+        WRITETIMER3(~TIMER3_2500us); // set delay in timer 3
+        // set comparator (CCP1)
+        CCPR1 = ~(TIMER3_2500us - (servoPortD[index] * 2));
+        // at last handle signal interrupt routine
+        sIsrTmr3();
+    }
 }
 
 // </editor-fold>
@@ -215,12 +237,12 @@ void updateLeds(void)
         // reset all led outputs (active low)
         ledOutput = 0x00;
         // KFS
-        if (s[i].KFS)
+        if (sList[i].KFS)
         {
             ledOutput |= LED_KFS;
         }
         // KOS
-        if (s[i].KOS)
+        if (sList[i].KOS)
         {
             ledOutput |= LED_KOS;
         }
@@ -253,37 +275,37 @@ void updateLeds(void)
         // pwm counter goes from 'INTENSITY_MAX' to 0
         // also the intensity has a value between 0 and 'INTENSITY_MAX'
         // W
-        if (s[i].intensity.W >= pwmCounter)
+        if (sList[i].intensity.W >= pwmCounter)
         {
             ledOutput |= LED_W;
         }
         // YV
-        if (s[i].intensity.YV >= pwmCounter)
+        if (sList[i].intensity.YV >= pwmCounter)
         {
             ledOutput |= LED_YV;
         }
         // R
-        if (s[i].intensity.R >= pwmCounter)
+        if (sList[i].intensity.R >= pwmCounter)
         {
             ledOutput |= LED_R;
         }
         // G
-        if (s[i].intensity.G >= pwmCounter)
+        if (sList[i].intensity.G >= pwmCounter)
         {
             ledOutput |= LED_G;
         }
         // YH
-        if (s[i].intensity.YH >= pwmCounter)
+        if (sList[i].intensity.YH >= pwmCounter)
         {
             ledOutput |= LED_YH;
         }
         // BA1
-        if (s[i].intensity.BA1 >= pwmCounter)
+        if (sList[i].intensity.BA1 >= pwmCounter)
         {
             ledOutput |= LED_BA1;
         }
         // BA2
-        if (s[i].intensity.BA2 >= pwmCounter)
+        if (sList[i].intensity.BA2 >= pwmCounter)
         {
             ledOutput |= LED_BA2;
         }
@@ -319,13 +341,15 @@ void lnRxMessageHandler(lnQueue_t* lnRxMsg)
                 {
                     if ((lnRxMsg->values[(lnRxMsg->head + 2) % QUEUE_SIZE] & 0x20) == 0x20)
                     {
-                        setCAWL(awList, index, true);
-                        setCAWR(awList, index, false);
+                        // bit DIR = true -> CAWL = true, CAWR = false
+                        setCAWL(index, true);
+                        setCAWR(index, false);
                     }
                     else
                     {
-                        setCAWL(awList, index, false);
-                        setCAWR(awList, index, true);
+                        // bit DIR = false -> CAWL = false, CAWR = true
+                        setCAWL(index, false);
+                        setCAWR(index, true);
                     }
                 }
                 break;
@@ -335,8 +359,8 @@ void lnRxMessageHandler(lnQueue_t* lnRxMsg)
                 // global power OFF request
                 for (uint8_t index = 0; index < 8; index++)
                 {
-                    setCAWL(awList, index, false);
-                    setCAWR(awList, index, false);
+                    setCAWL(index, false);
+                    setCAWR(index, false);
                 }
                 break;
             }
@@ -371,11 +395,52 @@ void lnRxMessageHandler(lnQueue_t* lnRxMsg)
 }
 
 /**
+ * this is the callback function for the AW (when the CAW status is changed)
+ * @param index: the index of AW in the AW list
+ * @param value: the value of CAW (true = CAWL, false = CAWR)
+ */
+void awCawHandler(uint8_t index, bool value)
+{
+    // create a 'request switch message'
+    // reference https://wiki.rocrail.net/doku.php?id=loconet:ln-pe-en
+    //           https://wiki.rocrail.net/doku.php?id=loconet:lnpe-parms-en
+    // OPCODE = 0xB0 (OPC_SW_REQ) 
+    // SW1 = turnout sensor address
+    //      0, A6, A5, A4, A3, A2, A1, A0
+    //      (A0 - A3 = index of AW)
+    //      (A4 - A6 = DIP switches 1 - 3)
+    // SW2 = alternately turnout sensor address and status
+    //      0, 0, DIR, ON, A10, A9, A8, A7
+    //      (A7 - A10 = DIP switches 4 - 7)
+    //      (ON = true, switch activation = ON)
+    //      (DIR = true -> CAWL = true and CAWR = false,
+    //      DIR = false -> CAWL = false and CAWR = true)
+
+    // get DIP switch address
+    uint8_t address = getDipSwitchAddress();
+
+    // make arguments SW1, SW2
+    uint8_t SW1 = ((uint8_t) ((address << 3) & 0x00f8) + index) & 0x7f;
+    uint8_t SW2 = ((uint8_t) (address >> 4) & 0x0f) + 0x10;
+    if (value)
+    {
+        SW2 |= 0x20;
+    }
+
+    // enqueue message
+    enQueue(&lnTxMsg, 0xB0);
+    enQueue(&lnTxMsg, SW1);
+    enQueue(&lnTxMsg, SW2);
+    // transmit the LN message
+    lnTxMessageHandler(&lnTxMsg);
+}
+
+/**
  * this is the callback function for the AW (when the KAW status is changed)
  * @param aw: the AW parameters
  * @param index: the index of AW in the AW list
  */
-void awHandler(AWCON_t* aw, uint8_t index)
+void awKawHandler(uint8_t index)
 {
     // create a 'turnout sensor state report'
     // reference https://wiki.rocrail.net/doku.php?id=loconet:ln-pe-en
@@ -396,11 +461,11 @@ void awHandler(AWCON_t* aw, uint8_t index)
     // make arguments SN1, SN2
     uint8_t SN1 = ((uint8_t) ((address << 3) & 0x00f8) + index) & 0x7f;
     uint8_t SN2 = (uint8_t) (address >> 4) & 0x0f;
-    if (aw->KAWR)
+    if (awList[index].KAWR)
     {
         SN2 |= 0x10;
     }
-    if (aw->KAWL)
+    if (awList[index].KAWL)
     {
         SN2 |= 0x20;
     }
@@ -439,7 +504,7 @@ void sHandler(uint8_t index)
     // make arguments SN1, SN2
     uint8_t IN1 = ((uint8_t) ((address << 3) & 0x00f8) + index) & 0x7f;
     uint8_t IN2 = (uint8_t) (address >> 4) & 0x0f;
-    if (s[index].KFS)
+    if (sList[index].KFS)
     {
         IN2 |= 0x10;
     }

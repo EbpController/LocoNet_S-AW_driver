@@ -9,9 +9,6 @@
  */
 
 #include "s.h"
-#include "ln.h"
-#include "MAX7219.h"
-#include "eeprom.h"
 
 // <editor-fold defaultstate="collapsed" desc="initialisation">
 
@@ -22,31 +19,6 @@ void sInit(sCallback_t fptr)
 {
     // initialise B signal callback function (function pointer)
     sCallback = fptr;
-    // get last S state (from EEPROM)
-    getLastSState(s);
-}
-
-/**
- * get last S state (from EEPROM)
- */
-void getLastSState(SCON_t *s)
-{
-    // get aspect and CVT_mode
-    for (uint8_t i = 0; i < 8; i++)
-    {
-        uint8_t data = eepromRead((uint16_t) (i + 2));
-
-        if ((data & 0x7f) > 17)
-        {
-            s[i].aspect = 0;
-            s[i].CVT_mode = false;
-        }
-        else
-        {
-            s[i].aspect = data & 0x1f;
-            s[i].CVT_mode = (data & 0x80) != 0x00;
-        }
-    }
 }
 
 // </editor-fold>
@@ -68,6 +40,10 @@ void sIsrTmr3()
     pwmDriver();
 }
 
+// </editor-fold>
+
+// <editor-fold defaultstate="collapsed" desc="routines">
+
 /**
  * period counter routine
  * @param index: the index of the signal
@@ -75,19 +51,19 @@ void sIsrTmr3()
  */
 bool periodCounter(uint8_t index)
 {
-    s[index].periodCounter++;
-    if (s[index].periodCounter < CVT_OFF_TIME)
+    sList[index].periodCounter++;
+    if (sList[index].periodCounter < CVT_OFF_TIME)
     {
         return true;
     }
     else
     {
         // use jitter for the CVT signals to prevent fickering at the same time
-        uint16_t cvtJitter = (uint16_t) (index + s[index].aspect) % 8;
+        uint16_t cvtJitter = (uint16_t) (index + sList[index].aspect) % 8;
 
-        if (s[index].periodCounter >= CVT_ON_TIME + CVT_OFF_TIME - cvtJitter)
+        if (sList[index].periodCounter >= CVT_ON_TIME + CVT_OFF_TIME - cvtJitter)
         {
-            s[index].periodCounter = 0;
+            sList[index].periodCounter = 0;
         }
         return false;
     }
@@ -100,29 +76,29 @@ bool periodCounter(uint8_t index)
 void setIntensity(uint8_t index)
 {
     // set intensities
-    if (s[index].aspect >= 14)
+    if (sList[index].aspect >= 14)
     {
         // check BA1 + BA2
-        if (fadeIn(&s[index].intensity.BA1) && fadeIn(&s[index].intensity.BA2))
+        if (fadeIn(&sList[index].intensity.BA1) && fadeIn(&sList[index].intensity.BA2))
         {
             // main panel
             setIntensityMainPanel(index, 12);
         }
     }
-    else if (s[index].aspect >= 10)
+    else if (sList[index].aspect >= 10)
     {
         // check BA2
-        if (fadeIn(&s[index].intensity.BA2))
+        if (fadeIn(&sList[index].intensity.BA2))
         {
             // main panel
             setIntensityMainPanel(index, 8);
         }
 
     }
-    else if (s[index].aspect >= 6)
+    else if (sList[index].aspect >= 6)
     {
         // check BA1
-        if (fadeIn(&s[index].intensity.BA1))
+        if (fadeIn(&sList[index].intensity.BA1))
         {
             // main panel
             setIntensityMainPanel(index, 4);
@@ -143,24 +119,24 @@ void setIntensity(uint8_t index)
 void setIntensityMainPanel(uint8_t index, uint8_t subtractor)
 {
     bool b = false;
-    bool CVT = s[index].CVT_mode && periodCounter(index);
-    switch (s[index].aspect - subtractor)
+    bool CVT = sList[index].CVT_mode && periodCounter(index);
+    switch (sList[index].aspect - subtractor)
     {
         case 0:
             // aspect R
-            fadeOut(&s[index].intensity.BA1);
-            fadeOut(&s[index].intensity.BA2);
-            fadeOut(&s[index].intensity.YH);
-            fadeOut(&s[index].intensity.YV);
-            fadeOut(&s[index].intensity.G);
-            fadeOut(&s[index].intensity.W);
+            fadeOut(&sList[index].intensity.BA1);
+            fadeOut(&sList[index].intensity.BA2);
+            fadeOut(&sList[index].intensity.YH);
+            fadeOut(&sList[index].intensity.YV);
+            fadeOut(&sList[index].intensity.G);
+            fadeOut(&sList[index].intensity.W);
             if (CVT)
             {
-                fadeOut(&s[index].intensity.R);
+                fadeOut(&sList[index].intensity.R);
             }
             else
             {
-                if (fadeIn(&s[index].intensity.R))
+                if (fadeIn(&sList[index].intensity.R))
                 {
                     setKFS(index, true);
                 }
@@ -169,20 +145,20 @@ void setIntensityMainPanel(uint8_t index, uint8_t subtractor)
             break;
         case 1:
             // aspect W
-            fadeOut(&s[index].intensity.BA1);
-            fadeOut(&s[index].intensity.BA2);
-            fadeOut(&s[index].intensity.YH);
-            fadeOut(&s[index].intensity.YV);
-            fadeOut(&s[index].intensity.G);
+            fadeOut(&sList[index].intensity.BA1);
+            fadeOut(&sList[index].intensity.BA2);
+            fadeOut(&sList[index].intensity.YH);
+            fadeOut(&sList[index].intensity.YV);
+            fadeOut(&sList[index].intensity.G);
             if (CVT)
             {
-                fadeOut(&s[index].intensity.R);
-                fadeOut(&s[index].intensity.W);
+                fadeOut(&sList[index].intensity.R);
+                fadeOut(&sList[index].intensity.W);
             }
             else
             {
-                b = fadeIn(&s[index].intensity.R);
-                b &= fadeIn(&s[index].intensity.W);
+                b = fadeIn(&sList[index].intensity.R);
+                b &= fadeIn(&sList[index].intensity.W);
                 if (b)
                 {
                     setKOS(index, true);
@@ -192,18 +168,18 @@ void setIntensityMainPanel(uint8_t index, uint8_t subtractor)
             break;
         case 2:
             // aspect Y
-            fadeOut(&s[index].intensity.R);
-            fadeOut(&s[index].intensity.W);
-            fadeOut(&s[index].intensity.G);
+            fadeOut(&sList[index].intensity.R);
+            fadeOut(&sList[index].intensity.W);
+            fadeOut(&sList[index].intensity.G);
             if (CVT)
             {
-                fadeOut(&s[index].intensity.YH);
-                fadeOut(&s[index].intensity.YV);
+                fadeOut(&sList[index].intensity.YH);
+                fadeOut(&sList[index].intensity.YV);
             }
             else
             {
-                b = fadeIn(&s[index].intensity.YH);
-                b &= fadeIn(&s[index].intensity.YV);
+                b = fadeIn(&sList[index].intensity.YH);
+                b &= fadeIn(&sList[index].intensity.YV);
                 if (b)
                 {
                     setKOS(index, true);
@@ -213,18 +189,18 @@ void setIntensityMainPanel(uint8_t index, uint8_t subtractor)
             break;
         case 3:
             // aspect H
-            fadeOut(&s[index].intensity.R);
-            fadeOut(&s[index].intensity.W);
-            fadeOut(&s[index].intensity.YV);
+            fadeOut(&sList[index].intensity.R);
+            fadeOut(&sList[index].intensity.W);
+            fadeOut(&sList[index].intensity.YV);
             if (CVT)
             {
-                fadeOut(&s[index].intensity.YH);
-                fadeOut(&s[index].intensity.G);
+                fadeOut(&sList[index].intensity.YH);
+                fadeOut(&sList[index].intensity.G);
             }
             else
             {
-                b = fadeIn(&s[index].intensity.YH);
-                b &= fadeIn(&s[index].intensity.G);
+                b = fadeIn(&sList[index].intensity.YH);
+                b &= fadeIn(&sList[index].intensity.G);
                 if (b)
                 {
                     setKOS(index, true);
@@ -234,18 +210,18 @@ void setIntensityMainPanel(uint8_t index, uint8_t subtractor)
             break;
         case 4:
             // aspect V
-            fadeOut(&s[index].intensity.R);
-            fadeOut(&s[index].intensity.W);
-            fadeOut(&s[index].intensity.YH);
+            fadeOut(&sList[index].intensity.R);
+            fadeOut(&sList[index].intensity.W);
+            fadeOut(&sList[index].intensity.YH);
             if (CVT)
             {
-                fadeOut(&s[index].intensity.YV);
-                fadeOut(&s[index].intensity.G);
+                fadeOut(&sList[index].intensity.YV);
+                fadeOut(&sList[index].intensity.G);
             }
             else
             {
-                b = fadeIn(&s[index].intensity.YV);
-                b &= fadeIn(&s[index].intensity.G);
+                b = fadeIn(&sList[index].intensity.YV);
+                b &= fadeIn(&sList[index].intensity.G);
                 if (b)
                 {
                     setKOS(index, true);
@@ -255,17 +231,17 @@ void setIntensityMainPanel(uint8_t index, uint8_t subtractor)
             break;
         case 5:
             // aspect G
-            fadeOut(&s[index].intensity.R);
-            fadeOut(&s[index].intensity.W);
-            fadeOut(&s[index].intensity.YH);
-            fadeOut(&s[index].intensity.YV);
+            fadeOut(&sList[index].intensity.R);
+            fadeOut(&sList[index].intensity.W);
+            fadeOut(&sList[index].intensity.YH);
+            fadeOut(&sList[index].intensity.YV);
             if (CVT)
             {
-                fadeOut(&s[index].intensity.G);
+                fadeOut(&sList[index].intensity.G);
             }
             else
             {
-                if (fadeIn(&s[index].intensity.G))
+                if (fadeIn(&sList[index].intensity.G))
                 {
                     setKOS(index, true);
                 }
@@ -320,10 +296,10 @@ bool fadeOut(uint16_t *intensity)
  */
 void setKOS(uint8_t index, bool value)
 {
-    if (s[index].KOS != value)
+    if (sList[index].KOS != value)
     {
         // change KOS status
-        s[index].KOS = value;
+        sList[index].KOS = value;
         // handle LN RX message (in the callback function)
         (*sCallback)(0);
     }
@@ -336,18 +312,14 @@ void setKOS(uint8_t index, bool value)
  */
 void setKFS(uint8_t index, bool value)
 {
-    if (s[index].KFS != value)
+    if (sList[index].KFS != value)
     {
         // change KFS status
-        s[index].KFS = value;
+        sList[index].KFS = value;
         // handle LN RX message (in the callback function)
         (*sCallback)(0);
     }
 }
-
-// </editor-fold>
-
-// <editor-fold defaultstate="collapsed" desc="routines">
 
 /**
  * set the aspect of the signal
@@ -381,56 +353,27 @@ void setAspect(uint8_t index, uint8_t aspect)
     if (aspect == 0)
     {
         // check if aspect is R_VNS, then set the VNS state
-        s[index].aspect = 0;
-        s[index].CVT_mode = false;
-        writeS(s[index].aspect, s[index].CVT_mode, index);
+        sList[index].aspect = 0;
+        sList[index].CVT_mode = false;
     }
     else if (aspect == 18)
     {
         // check if aspect is CVT then set the CVT state
-        s[index].aspect = 0;
-        s[index].CVT_mode = true;
-        writeS(s[index].aspect, s[index].CVT_mode, index);
+        sList[index].aspect = 0;
+        sList[index].CVT_mode = true;
     }
-    else if (isAspectValid(s[index].aspect, aspect))
+    else if (isAspectValid(sList[index].aspect, aspect))
     {
         // check if other aspects are valid
         aspect &= 0x1f;
-        s[index].aspect = aspect;
-        writeS(s[index].aspect, s[index].CVT_mode, index);
+        sList[index].aspect = aspect;
     }
-}
-
-/**
- * write S to EEPROM
- * @param aspect: the signal aspect to be write
- * @param CVT_mode: CVT mode of the signal
- * @param index: the index of the signal
- */
-void writeS(uint8_t aspect, bool CVT_mode, uint8_t index)
-{
-    // (over)write the aspect + CVT_mode into EEPROM
-    // the address location is the index value + 2
-    if (CVT_mode)
+    else
     {
-        aspect |= 0x80;
+        // if no aspect valid ... (do nothing)
     }
-    // keep aspect in EEPROM
-    eepromWrite((uint16_t) (index + 2), aspect);
-}
-
-/**
- * PWM driver (led output driver)
- */
-void pwmDriver()
-{
-    // set pwm counter
-    pwmCounter -= 50;
-    if (pwmCounter < 50)
-    {
-        // reset counter
-        pwmCounter = INTENSITY_MAX;
-    }
+    // update EEPROM data
+    updateEepromData(index);
 }
 
 /**
@@ -541,5 +484,20 @@ bool isAspectValid(uint8_t oldAspect, uint8_t newAspect)
     // all the rest of the aspect sequences are forbidden, so return false
     return false;
 }
+
+/**
+ * PWM driver (led output driver)
+ */
+void pwmDriver()
+{
+    // set pwm counter
+    pwmCounter -= 50;
+    if (pwmCounter < 50)
+    {
+        // reset counter
+        pwmCounter = INTENSITY_MAX;
+    }
+}
+
 // </editor-fold>
 

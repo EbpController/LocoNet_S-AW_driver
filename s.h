@@ -14,6 +14,7 @@
 #define	S_H
 
 #include "config.h"
+#include "eeprom.h"
 
 // definitions
 #define CVT_ON_TIME 240         // CVT on time, 600msec = 240 (with 2500us)
@@ -79,12 +80,13 @@ typedef struct {
 // servo callback definition (as function pointer)
 typedef void (*sCallback_t)(uint8_t);
 
-// routines
+// initialisation
 void sInit(sCallback_t);
-void getLastSState(SCON_t s[]);
-void sIsrTmr3();
-void writeS(uint8_t, bool, uint8_t);
-void pwmDriver(void);
+
+// ISR timer 3
+void sIsrTmr3(void);
+
+// routines
 bool periodCounter(uint8_t);
 void setIntensity(uint8_t);
 void setIntensityMainPanel(uint8_t, uint8_t);
@@ -94,11 +96,11 @@ void setKOS(uint8_t, bool);
 void setKFS(uint8_t, bool);
 void setAspect(uint8_t, uint8_t);
 bool isAspectValid(uint8_t, uint8_t);
+void pwmDriver(void);
 
 // variables
-// S used variables
 sCallback_t sCallback;
 uint16_t pwmCounter;
-SCON_t s[8];
+SCON_t sList[8];
 
 #endif	/* S_H */
