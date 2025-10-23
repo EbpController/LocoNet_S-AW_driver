@@ -93,11 +93,8 @@ void awUpdate(uint8_t index)
     // update servo on port D
     awUpdateServo(&servoPortD[index], index);
 #ifdef CAW_CONTROL
-    if (index < 4)
-    {
-        // check switches CAW
-        checkSwitchesCAW(index);
-    }
+    // check switches CAW
+    checkSwitchesCAW(index);
 #endif
 }
 
