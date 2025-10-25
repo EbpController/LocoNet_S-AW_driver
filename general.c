@@ -182,9 +182,9 @@ void __interrupt(low_priority) isrLow(void)
             // EUSART framing error (linebreak detected) or overrun error
             // read RCREG to clear the interrupt flag and FERR bit
              _ = RC1REG;
-            // OERR can be cleared by resetting the serial port
-             RC1STAbits.SPEN = false;
-             RC1STAbits.SPEN = true;
+            // OERR can be cleared by resetting the CREN bit
+            RC1STAbits.CREN = false;
+            RC1STAbits.CREN = true;
             // this framing error detection takes about 600탎
             // (10bits x 60탎) and a linebreak duration is specified at
             // 900탎, so add 300탎 after this detection time to complete
