@@ -197,7 +197,6 @@ void lnIsrTmr1(void)
         case TX:
             break;
         default:
-            startLinebreak(LINEBREAK_SHORT);
             break;
     }
 }
@@ -442,8 +441,17 @@ void startLnTxMessage(void)
     }
     while ((pointer != lnTxQueue.tail) &&
             ((lnTxQueue.values[pointer] & 0x80) != 0x80));
-    // send the first byte
-    sendTxByte();
+    // last check is LN bus is free
+    if (isLnFree())
+    {
+        // if free, start sending the first byte
+        sendTxByte();        
+     }
+    else
+    {
+        // if not free, restart CMP delay
+        startCmpDelay();
+    }
 }
 
 /**

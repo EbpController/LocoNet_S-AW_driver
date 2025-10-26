@@ -116,7 +116,7 @@ void initPorts()
 
 // </editor-fold>
 
-// <editor-fold defaultstate="collapsed" desc="ISR (high priority)">
+// <editor-fold defaultstate="collapsed" desc="ISR high priority">
 
 // there are two possible high interrupt triggers, coming from
 // the timer 3 overrun flag and/or coming from the comparator
