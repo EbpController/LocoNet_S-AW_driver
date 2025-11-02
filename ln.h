@@ -18,8 +18,9 @@
 #include "circular_queue.h"
 
 // definitions
+// a linebreak must take 15 bit times (see LocoNet specs)
+// with a bautrate of 16.666 is this 60usec * 15 = 900usec
 #define LINEBREAK_LONG 2500U
-#define LINEBREAK_SHORT 600U
 #define TIMER1_IDLE 2000U
 
 typedef enum {
@@ -51,11 +52,11 @@ void lnInitLeds(void);
 void lnIsrTmr1(void);
 void startIdleDelay(void);
 void startCmpDelay(void);
-void startLinebreak(uint16_t);
+void startLinebreak(void);
 uint16_t getRandomValue(uint16_t);
 
 // LN RX routines
-void lnIsrRc(uint8_t);
+void lnIsrRc(void);
 void rxHandler(uint8_t);
 
 // LN TX routines
@@ -67,8 +68,8 @@ void setTxMode(void);
 
 // LN aux. routines
 bool isLnFree(void);
-void enableEusartPort(void);
-void disableEusartPort(void);
+void enableEusartTxPort(void);
+void disableEusartTxPort(void);
 bool isChecksumCorrect(lnQueue_t*);
 void removeLastLnMessageFromQueue(lnQueue_t*);
 

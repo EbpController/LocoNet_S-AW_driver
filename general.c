@@ -179,24 +179,12 @@ void __interrupt(low_priority) isrLow(void)
          // EUSART RC interrupt
         if (RC1STAbits.FERR || RC1STAbits.OERR)
         {
-            // EUSART framing error (linebreak detected) or overrun error
-            // read RCREG to clear the interrupt flag and FERR bit
-             _ = RC1REG;
             // OERR can be cleared by resetting the CREN bit
             RC1STAbits.CREN = false;
             RC1STAbits.CREN = true;
-            // this framing error detection takes about 600탎
-            // (10bits x 60탎) and a linebreak duration is specified at
-            // 900탎, so add 300탎 after this detection time to complete
-            // a full linebreak
-            startLinebreak(LINEBREAK_LONG);
         }
-        else
-        {
-            // EUSART data received
-            // handle the received data
-            lnIsrRc(RC1REG);
-        }
+        // handle the received data
+        lnIsrRc();
     }
     if (PIE4bits.TMR3IE && PIR4bits.TMR3IF)
     {    
@@ -359,6 +347,10 @@ void lnRxMessageHandler(lnQueue_t* lnRxMsg)
                 // global power OFF request
                 for (uint8_t index = 0; index < 8; index++)
                 {
+                    // hold  last state of KAWR in memory
+                    awList[index].KAWR_lastState = awList[index].KAWR;
+                    awList[index].KAWL_lastState = awList[index].KAWL;
+                    // set AW in middle position
                     setCAWL(index, false);
                     setCAWR(index, false);
                 }

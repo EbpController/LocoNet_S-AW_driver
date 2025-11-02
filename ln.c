@@ -79,10 +79,13 @@ void lnInitEusart1(void)
     // set pins for EUSART 1 RX and TX
     TRISCbits.TRISC6 = false; // PORT C, pin 6 = LN TX
     ANSELCbits.ANSELC6 = false;
+    PORTCbits.RC6 = false;
     TRISCbits.TRISC7 = true; // PORT C, pin 7 = LN RX
     ANSELCbits.ANSELC7 = false;
     // refer to PIC18FxxQ10 datasheet 'PPS module' and 'CMP module'
-    enableEusartPort(); // EUSART 1 TX1 = RC6, RX1 = RC7
+    // connect EUSART 1 TX to RC6 only if we have something to send (in TX mode)
+    // connect EUSART 1 RX to RC7
+    RX1PPS = 0x17;
     // configure EUSART 1
     BAUD1CONbits.SCKP = true; // invert TX output signal
     BAUD1CONbits.BRG16 = false; // 16-bit baudrate generator
@@ -190,8 +193,9 @@ void lnIsrTmr1(void)
             }
             break;
         case LINEBREAK:
-            // after the linebreak delay (re)start EUSART and start CMP delay
-            enableEusartPort();
+            // after the linebreak reset the output pin (no linebreak)
+            PORTCbits.RC6 = false;
+            // and start CMP delay
             startCmpDelay(); // start the timer 1 with CMP delay
             break;
         case TX:
@@ -225,6 +229,8 @@ void startIdleDelay(void)
  */
 void startCmpDelay(void)
 {
+    // disable EUSART (TX) port
+    disableEusartTxPort();
     // delay CMP = 1200탎 + 360탎 + random (between 0탎 and 1023탎)
     uint16_t delay = getRandomValue(lastRandomValue);
     lastRandomValue = delay; // store last value of random generator
@@ -245,17 +251,18 @@ void startCmpDelay(void)
 
 /**
  * start of the linebreak delay (with a well defined time)
- * @param the time of the linebreak
  * @return 
  */
-void startLinebreak(uint16_t timeLinebreak)
+void startLinebreak(void)
 {
     // linebreak detect by framing error
-    disableEusartPort();
-    // a LN linebreak definition 
-    TMR1H = (uint8_t) (~timeLinebreak >> 8); // set delay in timer 1
-    TMR1L = (uint8_t) (~timeLinebreak & 0x00ff);
-    // WRITETIMER1(~timeLinebreak);
+    // disable EUSART (TX) port and force a linebreak
+    disableEusartTxPort();
+    PORTCbits.RC6 = true;
+    // setup the LN linebreak period 
+    TMR1H = (uint8_t) (~LINEBREAK_LONG >> 8); // set delay in timer 1
+    TMR1L = (uint8_t) (~LINEBREAK_LONG & 0x00ff);
+    // WRITETIMER1(~LINEBREAK_LONG);
     // disable TX and enable timer interrupts
     PIE3bits.TX1IE = false; // disable EUSART 1 TXD interrupt
     PIE4bits.TMR1IE = true; // enable timer 1 overflow interrupt
@@ -303,10 +310,12 @@ uint16_t getRandomValue(uint16_t startState)
 
 /**
  * interrupt routine for EUSART RX
- * @param lnRxData: the received byte
  */
-void lnIsrRc(uint8_t lnRxData)
+void lnIsrRc(void)
 {
+    // read the data from RX buffer
+    uint8_t lnRxData = RC1REG;
+    
     if (LNCON.LN_MODE == TX)
     {
         // device is in TX mode
@@ -329,7 +338,7 @@ void lnIsrRc(uint8_t lnRxData)
         else
         {
             // if LN RX data is not equal to LN TX data send linebreak
-            startLinebreak(LINEBREAK_LONG);
+            startLinebreak();
         }
     }
     else if (LNCON.LN_MODE != LINEBREAK)
@@ -444,6 +453,8 @@ void startLnTxMessage(void)
     // last check is LN bus is free
     if (isLnFree())
     {
+        // setup EUSART TX mode
+        enableEusartTxPort();
         // if free, start sending the first byte
         sendTxByte();        
      }
@@ -499,25 +510,21 @@ bool isLnFree(void)
 }
 
 /**
- * enable the EUSART port
+ * enable the EUSART TX port
  */
-void enableEusartPort(void)
+void enableEusartTxPort(void)
 {
     // connect EUSART 1 TX to RC6
     RC6PPS = 0x09;
-    // connect EUSART 1 RX to RC7
-    RX1PPS = 0x17;
 }
 
 /**
- * disable the EUSART port
+ * disable the EUSART TX port
  */
-void disableEusartPort(void)
+void disableEusartTxPort(void)
 {
     // deconnect EUSART 1 TX from RC6, return to normal IO pin
     RC6PPS = 0x00;
-    // and force la linebreak
-    PORTCbits.RC6 = true;
 }
 
 /**
