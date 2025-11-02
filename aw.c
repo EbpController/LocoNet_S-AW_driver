@@ -204,8 +204,6 @@ void setKAWL(uint8_t index, bool value)
         awList[index].KAWL = value;
         // handle the changed KAW state (in the callback function)
         (*awKawCallback)(index);
-        // hold  last state of KAWL in memory
-        awList[index].KAWL_lastState = value;
         // update EEPROM data
         updateEepromData(index);
     }
@@ -224,8 +222,6 @@ void setKAWR(uint8_t index, bool value)
         awList[index].KAWR = value;
         // handle the changed KAW state (in the callback function)
         (*awKawCallback)(index);
-        // hold  last state of KAWR in memory
-        awList[index].KAWR_lastState = value;
         // update EEPROM data
         updateEepromData(index);
     }
